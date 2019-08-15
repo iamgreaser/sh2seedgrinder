@@ -224,7 +224,7 @@ def grind_seeds(matches, results, seedoffs, seedstep) -> int:
             R[(r+j+0x80)&0x7F] = seed
             seed = ((seed * 1103515245) + 12345) & 0x7FFFFFFF
 
-        if ((r-seedoffs) & 0xFFFFF) == 0: print((r-seedoffs+seedstep)*100.0/(1<<31))
+        if ((r-seedoffs+seedstep) & 0xFFFFF) == 0: print((r-seedoffs+seedstep)*100.0/(1<<31))
 
         if rslot >= 100:
             return rslot
