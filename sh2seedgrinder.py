@@ -1,11 +1,42 @@
 #!/usr/bin/env python3
 # vim: set sts=4 sw=4 et :
+#
+# sh2seedgrinder.py
+# Copyright (c) GreaseMonkey, 2019
+#
+# This software is provided 'as-is', without any express or implied
+# warranty. In no event will the authors be held liable for any damages
+# arising from the use of this software.
+#
+# Permission is granted to anyone to use this software for any purpose,
+# including commercial applications, and to alter it and redistribute it
+# freely, subject to the following restrictions:
+#
+#     1. The origin of this software must not be misrepresented; you
+#        must not claim that you wrote the original software. If you use
+#        this software in a product, an acknowledgment in the product
+#        documentation would be appreciated but is not required.
+#
+#     2. Altered source versions must be plainly marked as such, and
+#        must not be misrepresented as being the original software.
+#
+#     3. This notice may not be removed or altered from any source
+#        distribution.
+#
 
 """Grinds the entire 2^31 seed space for Silent Hill 2 and spit out the results.
-Bail out if more than 100 
+Bail out if more than 100 results are found.
+
+You will probably want at least Python 3.6.
+Python 3.7 should be fine.
+Run this in the command line! It comes with its own help and some sanity checking.
 
 Using Python for something that's supposed to be fast was probably a mistake.
 numba is pretty fast, but also pretty crashy.
+
+Also it's slower than I'd like it to be at this point.
+
+Oh yeah, as expected, big shoutouts to sh2_luck for doing this stuff and making a table and actually making SH2 RNG manip viable for runs. sh2_luck was also a big help with answering questions when I attempted to reverse-engineer the RNG myself after their discovery, and that made it possible for me to replicate their work.
 """
 BASE_SEED = 0x6A4F8C55
 
@@ -114,7 +145,7 @@ def calc_all_from_seed(R, arsonist_shuffle, matches, results, rslot, rreal) -> b
     digit1 = R[(r+20)] % 8
     digit2 = R[(r+21)] % 7
     orig_digit2 = digit2
-    if digit0 <= digit1: digit1 += 1 
+    if digit0 <= digit1: digit1 += 1
     if digit0 <= orig_digit2: digit2 += 1
     if digit1 <= orig_digit2: digit2 += 1
 
