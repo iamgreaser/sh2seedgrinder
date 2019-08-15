@@ -1,0 +1,10 @@
+# Python
+*.pyc
+*.pyo
+*.pyz
+.mypy_cache/
+__pycache__/
+
+# VIM
+.sw?
+.*.sw?
