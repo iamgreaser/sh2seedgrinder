@@ -190,13 +190,16 @@ def calc_all_from_seed(R, arsonist_shuffle, matches, results, rslot, rreal) -> b
         "arsonist_shuffle": uint32[:],
         "results": uint32[:, ::1],
         "matches": uint32[:],
+        "seedoffs": uint32,
+        "seedstep": uint32,
         "seed": uint32,
         "i": uint32,
+        "j": uint32,
         "r": uint32,
         "rstep": uint32,
     },
 )
-def grind_seeds(matches, results) -> int:
+def grind_seeds(matches, results, seedoffs, seedstep) -> int:
     R = numpy.full(0x80, uint32(0))
     arsonist_shuffle = numpy.full(6, uint32(0))
     rslot = 0
@@ -207,13 +210,20 @@ def grind_seeds(matches, results) -> int:
         R[i+0x40] = seed
         seed = ((seed * 1103515245) + 12345) & 0x7FFFFFFF
 
-    for r in range(1<<31):
+    for j in range(seedoffs):
+        R[(j+0x40)&0x7F] = seed
+        R[(j+0x80)&0x7F] = seed
+        seed = ((seed * 1103515245) + 12345) & 0x7FFFFFFF
+
+    for r in range(seedoffs, 1<<31, seedstep):
         if calc_all_from_seed(R, arsonist_shuffle, matches, results, rslot, r):
             rslot += 1
 
-        R[(r+0x40)&0x7F] = seed
-        R[(r+0x80)&0x7F] = seed
-        seed = ((seed * 1103515245) + 12345) & 0x7FFFFFFF
+        for j in range(seedstep):
+            R[(r+j+0x40)&0x7F] = seed
+            R[(r+j+0x80)&0x7F] = seed
+            seed = ((seed * 1103515245) + 12345) & 0x7FFFFFFF
+
         if (r & 0xFFFFF) == 0: print(r*100.0/(1<<31))
 
         if rslot >= 100:
@@ -281,13 +291,15 @@ if __name__ == "__main__":
     has_constraint = False
 
     clock_str = args.clock
+    clock = None
     if clock_str is not None:
         clock_h_str, _, clock_m_str, = clock_str.partition(":")
         clock_h = int(clock_h_str)
         clock_m = int(clock_m_str)
         assert 0 <= clock_h < 12
         assert 0 <= clock_m < 60
-        matches[0] = 60*clock_h+clock_m
+        clock = 60*clock_h+clock_m
+        matches[0] = clock
         has_constraint = True
 
     blood = args.blood
@@ -337,8 +349,20 @@ if __name__ == "__main__":
         parser.print_help()
         parser.exit(1)
 
+    seedstep = 1
+    seedoffs = 0
+    # seedstep optimisation:
+    # Look at the bottom bits of various mod 2^N seed sources.
+    # If they're set, we can find our starting point.
+    # TODO: Most of these.
+    if clock is not None:
+        clockseedoffs = (clock+2)&0x3
+        assert ((seedoffs^clockseedoffs)&(seedstep-1)) == 0, "these seeds can't work"
+        seedstep = 4
+        seedoffs = clockseedoffs
+
     results = numpy.full((100, 9), uint32(0))
-    result_count = grind_seeds(matches, results)
+    result_count = grind_seeds(matches, results, seedoffs, seedstep)
     for rslot in range(result_count-1,-1,-1):
         m_clock_angle = results[rslot][0]
         m_code_blood = results[rslot][1]
