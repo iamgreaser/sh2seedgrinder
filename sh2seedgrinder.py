@@ -82,6 +82,7 @@ def rand_nlow_coeffs(n: int) -> Tuple[int, int]:
     c = (c * SEED_ADD) & SEED_ANDMASK
     return (a, c,)
 
+
 def rand_nlow_coeffs_accumulated(n: int) -> Tuple[Sequence[int], Sequence[int]]:
     a = 1
     c = 0
@@ -94,15 +95,6 @@ def rand_nlow_coeffs_accumulated(n: int) -> Tuple[Sequence[int], Sequence[int]]:
         a = (a * SEED_MUL) & SEED_ANDMASK
     return (La, Lc,)
 
-def rand_nlow_accumulated(seed: int, n: int) -> Sequence[int]:
-    a = 1
-    c = 0
-    L: List[int] = []
-    for i in range(n):
-        L.append(BASE_TYPE(((a * seed) + c) & SEED_ANDMASK))
-        c = (c + a * SEED_ADD) & SEED_ANDMASK
-        a = (a * SEED_MUL) & SEED_ANDMASK
-    return L
 
 def spew_result(r, seed, m_clock_angle, m_code_blood, m_code_carbon, m_code_spin, m_bug_code, m_arsonist, m_briefcase):
     result = "%10u,0x%08X,%02d:%02d,%04d,%04d,%04d,%03d,%1d,%4s" % (
