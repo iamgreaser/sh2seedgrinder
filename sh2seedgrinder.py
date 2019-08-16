@@ -36,16 +36,25 @@ numba is pretty fast, but also pretty crashy.
 
 Also it's slower than I'd like it to be at this point.
 
+UPDATE: numba is now gone.
+
 Oh yeah, as expected, big shoutouts to sh2_luck for doing this stuff and making a table and actually making SH2 RNG manip viable for runs. sh2_luck was also a big help with answering questions when I attempted to reverse-engineer the RNG myself after their discovery, and that made it possible for me to replicate their work.
 """
+
 BASE_SEED = 0x6A4F8C55
+PARALLEL_LENGTH = 2048
+#PARALLEL_LENGTH = 2
 
 import argparse
+from typing import List
+from typing import Sequence
+from typing import Tuple
 
 # GOTTA GO FAST
-from numba import jit
-from numba.types import uint32
+# WITHOUT BEING A BROKEN PILE OF GARBAGE THIS TIME SO GOODBYE NUMBA
 import numpy
+#from numpy import uint32 as BASE_TYPE
+from numpy import int64 as BASE_TYPE
 
 briefcase_words = [
     "open", "damn", "hell", "town",
@@ -54,6 +63,46 @@ briefcase_words = [
     "dose", "over", "dust", "time",
     "help", "kill", "null", "cock",
 ]
+
+SEED_MUL = BASE_TYPE(1103515245)
+SEED_ADD = BASE_TYPE(12345)
+SEED_ANDMASK = BASE_TYPE(0x7FFFFFFF)
+SEED_MOD = BASE_TYPE(0x80000000)
+
+def rand_once(seed: int) -> int:
+    return ((seed * SEED_MUL) + SEED_ADD) & SEED_ANDMASK
+
+
+def rand_nlow_coeffs(n: int) -> Tuple[int, int]:
+    a = BASE_TYPE(1)
+    c = BASE_TYPE(0)
+    for i in range(n):
+        c = BASE_TYPE(c + a) & SEED_ANDMASK
+        a = BASE_TYPE(a * SEED_MUL) & SEED_ANDMASK
+    c = (c * SEED_ADD) & SEED_ANDMASK
+    return (a, c,)
+
+def rand_nlow_coeffs_accumulated(n: int) -> Tuple[Sequence[int], Sequence[int]]:
+    a = BASE_TYPE(1)
+    c = BASE_TYPE(0)
+    La: List[int] = []
+    Lc: List[int] = []
+    for i in range(n):
+        La.append(a)
+        Lc.append(c)
+        c = BASE_TYPE(c + a * SEED_ADD) & SEED_ANDMASK
+        a = BASE_TYPE(a * SEED_MUL) & SEED_ANDMASK
+    return (La, Lc,)
+
+def rand_nlow_accumulated(seed: int, n: int) -> Sequence[int]:
+    a = BASE_TYPE(1)
+    c = BASE_TYPE(0)
+    L: List[int] = []
+    for i in range(n):
+        L.append(((a * seed) + c) & SEED_ANDMASK)
+        c = BASE_TYPE(c + a * SEED_ADD) & SEED_ANDMASK
+        a = BASE_TYPE(a * SEED_MUL) & SEED_ANDMASK
+    return L
 
 def spew_result(r, seed, m_clock_angle, m_code_blood, m_code_carbon, m_code_spin, m_bug_code, m_arsonist, m_briefcase):
     result = "%10u,0x%08X,%02d:%02d,%04d,%04d,%04d,%03d,%1d,%4s" % (
@@ -70,166 +119,181 @@ def spew_result(r, seed, m_clock_angle, m_code_blood, m_code_carbon, m_code_spin
     )
     print(result)
 
-@jit(
-    nopython=True,
-    nogil=True,
-    locals={
-        "R": uint32[:],
-        "results": uint32[:, ::1],
-        "matches": uint32[:],
-        "rslot": uint32,
-        "r": uint32,
-        "rreal": uint32,
-        "m_clock_angle": uint32,
-        "m_code_carbon": uint32,
-        "m_code_blood": uint32,
-        "m_code_spin": uint32,
-        "m_code_carbon": uint32,
-        "code1digit": uint32,
-        "code2digit": uint32,
-        "m_code_blood": uint32,
-        "m_code_spin": uint32,
-        "digit0": uint32,
-        "digit1": uint32,
-        "digit2": uint32,
-        "orig_digit2": uint32,
-        "m_bug_code": uint32,
-        "arsonist_shuffle": uint32[:],
-        "m_arsonist": uint32,
-        "i": uint32,
-        "iVar5": uint32,
-        "m_arsonist": uint32,
-        "m_briefcase": uint32,
-        "seed": uint32,
-    },
-)
-def calc_all_from_seed(R, arsonist_shuffle, matches, results, rslot, rreal) -> bool:
-    r = rreal & 0x3F
-    m_clock_angle = (R[(r+1)] % 660)
-    if m_clock_angle > 520:
-        m_clock_angle = m_clock_angle + 60
 
-    if True:
-        m_code_carbon = (0
-            + ((R[(r+ 7)] % 9) + 1) * 1000
-            + ((R[(r+10)] % 9) + 1) * 100
-            + ((R[(r+13)] % 9) + 1) * 10
-            + ((R[(r+16)] % 9) + 1)
-        )
-        m_code_blood = 0
-        m_code_spin = 0
-        for i in range(4):
-            code1digit = R[(r+8+i*3)] % 9
-            code2digit = ((R[(r+9+i*3)] % 8) + 1 + code1digit) % 9
-            #m_code_blood += (code1digit+1) * (10**(3-i))
-            #m_code_spin += (code2digit+1) * (10**(3-i))
-            m_code_blood = (code1digit+1) + m_code_blood * 10
-            m_code_spin = (code2digit+1) + m_code_spin * 10
+def calc_all_from_seed(*, R, zero, match_mask, match_value, results, selection, rreal):
+    m_clock_angle = R[1]
+    m_clock_angle += (m_clock_angle > 520) * 60
 
-    else:
-        m_code_carbon = 0
-        m_code_blood = 0
-        m_code_spin = 0
-        for i in range(4):
-            m_code_carbon = ((R[(r+7+i*3)] % 9) + 1) + m_code_carbon * 10
-            #m_code_carbon += ((R[(r+7+i*3)] % 9) + 1) * (10**(3-i))
+    m_code_carbon = (
+          (R[ 7] + 1) * 1000
+        + (R[10] + 1) * 100
+        + (R[13] + 1) * 10
+        + (R[16] + 1)
+    )
+    m_code_blood = zero.copy()
+    m_code_spin = zero.copy()
+    for i in range(4):
+        code1digit = R[(8+i*3)]
+        code2digit = ((R[(9+i*3)]) + 1 + code1digit) % 9
+        #m_code_blood += (code1digit+1) * (10**(3-i))
+        #m_code_spin += (code2digit+1) * (10**(3-i))
+        m_code_blood = (code1digit+1) + m_code_blood * 10
+        m_code_spin = (code2digit+1) + m_code_spin * 10
 
-            code1digit = R[(r+8+i*3)] % 9
-            code2digit = ((R[(r+9+i*3)] % 8) + 1 + code1digit) % 9
-            #m_code_blood += (code1digit+1) * (10**(3-i))
-            #m_code_spin += (code2digit+1) * (10**(3-i))
-            m_code_blood = (code1digit+1) + m_code_blood * 10
-            m_code_spin = (code2digit+1) + m_code_spin * 10
-
-    digit0 = R[(r+19)] % 9
-    digit1 = R[(r+20)] % 8
-    digit2 = R[(r+21)] % 7
+    digit0 = R[(19)]
+    digit1 = R[(20)]
+    digit2 = R[(21)]
     orig_digit2 = digit2
-    if digit0 <= digit1: digit1 += 1
-    if digit0 <= orig_digit2: digit2 += 1
-    if digit1 <= orig_digit2: digit2 += 1
+    digit1 += (digit0 <= digit1)
+    digit2 += (digit0 <= orig_digit2)
+    digit2 += (digit1 <= orig_digit2)
 
-    m_bug_code = (0
-        + 100*(digit0+1)
+    m_bug_code = (
+          100*(digit0+1)
         + 10 *(digit1+1)
         + 1  *(digit2+1)
     )
 
-    m_arsonist = 999
-    for i in range(6):
-        arsonist_shuffle[i] = i
+    m_arsonist = zero.copy()
 
-    for i in range(6):
-        iVar5 = i + (R[(r+22+i)] % (6-i))
-        if arsonist_shuffle[iVar5] == 5:
-            m_arsonist = (5-i)+1
-        arsonist_shuffle[iVar5] = arsonist_shuffle[i]
+    if False:
+        # FIXME: Arsonist is broken until I can find out how to make numpy do a scatter operation.
+        arsonist_shuffle = (numpy.full((PARALLEL_LENGTH, 1), 1, dtype=BASE_TYPE) * numpy.arange(6, dtype=BASE_TYPE)).transpose()
+        #print(arsonist_shuffle)
+        for i in range(6):
+            iVar5 = i + R[(22+i)]
+            #print(iVar5, arsonist_shuffle.take(iVar5))
+            m_arsonist += ((5-i)+1)*(iVar5.choose(arsonist_shuffle) == 5)
+            midshuf = arsonist_shuffle.transpose()
+            midshuf.put(iVar5, arsonist_shuffle[i])#.take(i))
+            arsonist_shuffle = midshuf.transpose()
+            print(iVar5, arsonist_shuffle, arsonist_shuffle.take(i))
 
-    m_briefcase = R[(r+30)] % 19
+    m_briefcase = R[(30)]
 
-    results[rslot][0] = m_clock_angle
-    results[rslot][1] = m_code_blood
-    results[rslot][2] = m_code_carbon
-    results[rslot][3] = m_code_spin
-    results[rslot][4] = m_bug_code
-    results[rslot][5] = m_arsonist
-    results[rslot][6] = m_briefcase
-    for i in range(7):
-        if matches[i] < 0x10000 and results[rslot][i] != matches[i]:
-            return False
+    results[0] = m_clock_angle
+    results[1] = m_code_blood
+    results[2] = m_code_carbon
+    results[3] = m_code_spin
+    results[4] = m_bug_code
+    results[5] = m_arsonist
+    results[6] = m_briefcase
+    results[7] = rreal
+    results[8] = R[(0)]
+    selection = ((results*match_mask==match_value*match_mask).sum(axis=0) == 9)
 
-    results[rslot][7] = rreal
-    results[rslot][8] = R[(r+0)]
-    return True
+    return (selection, results)
 
 
-@jit(
-    nopython=True,
-    locals={
-        "R": uint32[:],
-        "arsonist_shuffle": uint32[:],
-        "results": uint32[:, ::1],
-        "matches": uint32[:],
-        "seedoffs": uint32,
-        "seedstep": uint32,
-        "seed": uint32,
-        "i": uint32,
-        "j": uint32,
-        "r": uint32,
-        "rstep": uint32,
-    },
-)
-def grind_seeds(matches, results, seedoffs, seedstep) -> int:
-    R = numpy.full(0x80, uint32(0))
-    arsonist_shuffle = numpy.full(6, uint32(0))
-    rslot = 0
+def grind_seeds(*, matches, seedoffs, seedstep) -> int:
+    SEED_MUL_ARRAY = numpy.full(32, 0, dtype=BASE_TYPE)
+    SEED_ADD_ARRAY = numpy.full(32, 0, dtype=BASE_TYPE)
+    for i in range(32):
+        a, c, = rand_nlow_coeffs(i)
+        SEED_MUL_ARRAY[i] = a
+        SEED_ADD_ARRAY[i] = c
+
+    MOD_ARRAY = numpy.array([
+        0x80000000,
+        # 1
+        660,
+        0x80000000,
+        0x80000000,
+        0x80000000,
+        0x80000000,
+        0x80000000,
+        # 7
+        9, 9, 8,
+        9, 9, 8,
+        9, 9, 8,
+        9, 9, 8,
+        # 19
+        9, 8, 7,
+        # 22
+        6, 5, 4, 3, 2, 1,
+        # 28
+        0x80000000,
+        0x80000000,
+        # 30
+        19,
+        # 31
+        0x80000000,
+    ], dtype=BASE_TYPE)
 
     seed = BASE_SEED
-    for i in range(0x40):
-        R[i] = seed
-        R[i+0x40] = seed
-        seed = ((seed * 1103515245) + 12345) & 0x7FFFFFFF
-
     for j in range(seedoffs):
-        R[(j+0x40)&0x7F] = seed
-        R[(j+0x80)&0x7F] = seed
         seed = ((seed * 1103515245) + 12345) & 0x7FFFFFFF
 
-    for r in range(seedoffs, 1<<31, seedstep):
-        if calc_all_from_seed(R, arsonist_shuffle, matches, results, rslot, r):
-            rslot += 1
+    rslot = 0
+    results = numpy.full(9, 0, dtype=BASE_TYPE)
+    selection = False
+    zero = 0
+    match_mask = numpy.array([int(v < 0x10000) for v in matches], dtype=BASE_TYPE)
+    match_value = numpy.array(matches, dtype=BASE_TYPE)
 
-        for j in range(seedstep):
-            R[(r+j+0x40)&0x7F] = seed
-            R[(r+j+0x80)&0x7F] = seed
-            seed = ((seed * 1103515245) + 12345) & 0x7FFFFFFF
+    out_results = []
 
-        if ((r-seedoffs+seedstep) & 0xFFFFF) == 0: print((r-seedoffs+seedstep)*100.0/(1<<31))
+    R = numpy.full(32, seed, dtype=BASE_TYPE)
+    R *= SEED_MUL_ARRAY
+    R &= 0x7FFFFFFF
+    R += SEED_ADD_ARRAY
+    R &= 0x7FFFFFFF
+
+    # Arrayify it
+    seedstep_a, seedstep_c, = rand_nlow_coeffs(seedstep * PARALLEL_LENGTH)
+    seedstep_parallel = seedstep * PARALLEL_LENGTH
+    La, Lc, = rand_nlow_coeffs_accumulated(seedstep_parallel)
+    PARALLEL_A = numpy.array(La[::seedstep], dtype=BASE_TYPE)
+    PARALLEL_C = numpy.array(Lc[::seedstep], dtype=BASE_TYPE)
+
+    R = (numpy.full((PARALLEL_LENGTH, 32,), 1, dtype=BASE_TYPE) * R).transpose()
+    R *= PARALLEL_A
+    R &= SEED_ANDMASK
+    R += PARALLEL_C
+    R &= SEED_ANDMASK
+    results = (numpy.full((PARALLEL_LENGTH, 9,), 1, dtype=BASE_TYPE) * numpy.full(9, 0, dtype=BASE_TYPE)).transpose()
+    selection = numpy.full(PARALLEL_LENGTH, selection, dtype=BASE_TYPE)
+    zero = numpy.full(PARALLEL_LENGTH, zero, dtype=BASE_TYPE)
+    match_mask = (numpy.full((PARALLEL_LENGTH, len(matches),), 1, dtype=BASE_TYPE) * match_mask).transpose()
+    match_value = (numpy.full((PARALLEL_LENGTH, len(matches),), 1, dtype=BASE_TYPE) * match_value).transpose()
+    MOD_ARRAY = (numpy.full((PARALLEL_LENGTH, 32,), 1, dtype=BASE_TYPE) * MOD_ARRAY).transpose()
+
+    for r in range(seedoffs, 1<<31, seedstep_parallel):
+        rreal = r + numpy.arange(PARALLEL_LENGTH, dtype=BASE_TYPE)*seedstep
+        #R = (seed * SEED_MUL_ARRAY + SEED_ADD_ARRAY) & 0x7FFFFFFF
+        #R = (seed * SEED_MUL_ARRAY + SEED_ADD_ARRAY) & 0x7FFFFFFF
+        R2 = R % MOD_ARRAY
+        #results *= 0
+        new_selection, new_results = calc_all_from_seed(
+            R=R2,
+            zero=zero,
+            match_mask=match_mask,
+            match_value=match_value,
+            results=results,
+            selection=selection,
+            rreal=rreal,
+        )
+
+        for ns, nr in zip(new_selection, new_results.transpose()):
+            if ns:
+                out_results.append(nr.tolist())
+                rslot += 1
+        #rslot += did_calc
+        #print(new_results)
+
+        R *= seedstep_a
+        R &= SEED_ANDMASK
+        R += seedstep_c
+        R &= SEED_ANDMASK
+        #seed = R[0]
+
+        #if ((r-seedoffs+seedstep) & 0xFFFFF) == 0: print((r-seedoffs+seedstep)*100.0/(1<<31))
+        if ((r-seedoffs+seedstep_parallel) & 0xFFFF) == 0: print((r-seedoffs+seedstep_parallel)*100.0/(1<<31))
 
         if rslot >= 100:
-            return rslot
+            return out_results
 
-    return rslot
+    return out_results
 
 
 if __name__ == "__main__":
@@ -284,11 +348,20 @@ if __name__ == "__main__":
         help="Force a 4-letter briefcase word.",
     )
 
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Generate something even if no constraints are provided.",
+    )
+
     args = parser.parse_args()
 
-    matches = numpy.full(9, uint32(0x10000))
+    matches = numpy.full(9, 0x10000, dtype=BASE_TYPE)
 
     has_constraint = False
+
+    if args.force:
+        has_constraint = True
 
     clock_str = args.clock
     clock = None
@@ -361,9 +434,15 @@ if __name__ == "__main__":
         seedstep = 4
         seedoffs = clockseedoffs
 
-    results = numpy.full((100, 9), uint32(0))
-    result_count = grind_seeds(matches, results, seedoffs, seedstep)
-    for rslot in range(result_count-1,-1,-1):
+    results = grind_seeds(
+        matches=matches,
+        seedoffs=seedoffs,
+        seedstep=seedstep,
+    )
+    results = results[::-1]
+    result_count = len(results)
+
+    for rslot in range(len(results)):
         m_clock_angle = results[rslot][0]
         m_code_blood = results[rslot][1]
         m_code_carbon = results[rslot][2]
