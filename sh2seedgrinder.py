@@ -188,40 +188,43 @@ def calc_all_from_seed(*, R, zero, match_mask, match_value, results, selection, 
     return (selection, results)
 
 
-def grind_seeds(*, matches, seedoffs, seedstep) -> int:
-    SEED_MUL_ARRAY = numpy.full(32, 0, dtype=BASE_TYPE)
-    SEED_ADD_ARRAY = numpy.full(32, 0, dtype=BASE_TYPE)
-    for i in range(32):
-        a, c, = rand_nlow_coeffs(i)
-        SEED_MUL_ARRAY[i] = a
-        SEED_ADD_ARRAY[i] = c
+SEED_MUL_ARRAY = numpy.full(32, 0, dtype=BASE_TYPE)
+SEED_ADD_ARRAY = numpy.full(32, 0, dtype=BASE_TYPE)
+for i in range(32):
+    a, c, = rand_nlow_coeffs(i)
+    SEED_MUL_ARRAY[i] = a
+    SEED_ADD_ARRAY[i] = c
 
-    MOD_ARRAY = numpy.array([
-        0x80000000,
-        # 1
-        660,
-        0x80000000,
-        0x80000000,
-        0x80000000,
-        0x80000000,
-        0x80000000,
-        # 7
-        9, 9, 8,
-        9, 9, 8,
-        9, 9, 8,
-        9, 9, 8,
-        # 19
-        9, 8, 7,
-        # 22
-        6, 5, 4, 3, 2, 1,
-        # 28
-        0x80000000,
-        0x80000000,
-        # 30
-        19,
-        # 31
-        0x80000000,
-    ], dtype=BASE_TYPE)
+MOD_ARRAY = numpy.array([
+    0x80000000,
+    # 1
+    660,
+    0x80000000,
+    0x80000000,
+    0x80000000,
+    0x80000000,
+    0x80000000,
+    # 7
+    9, 9, 8,
+    9, 9, 8,
+    9, 9, 8,
+    9, 9, 8,
+    # 19
+    9, 8, 7,
+    # 22
+    6, 5, 4, 3, 2, 1,
+    # 28
+    0x80000000,
+    0x80000000,
+    # 30
+    19,
+    # 31
+    0x80000000,
+], dtype=BASE_TYPE)
+
+MOD_ARRAY = (numpy.full((PARALLEL_LENGTH, 32,), 1, dtype=BASE_TYPE) * MOD_ARRAY).transpose()
+
+def grind_seeds(*, matches, seedoffs, seedstep) -> int:
 
     seed = BASE_SEED
     for j in range(seedoffs):
@@ -259,7 +262,6 @@ def grind_seeds(*, matches, seedoffs, seedstep) -> int:
     zero = numpy.full(PARALLEL_LENGTH, zero, dtype=BASE_TYPE)
     match_mask = (numpy.full((PARALLEL_LENGTH, len(matches),), 1, dtype=BASE_TYPE) * match_mask).transpose()
     match_value = (numpy.full((PARALLEL_LENGTH, len(matches),), 1, dtype=BASE_TYPE) * match_value).transpose()
-    MOD_ARRAY = (numpy.full((PARALLEL_LENGTH, 32,), 1, dtype=BASE_TYPE) * MOD_ARRAY).transpose()
 
     for r in range(seedoffs, 1<<31, seedstep_parallel):
         rreal = r + numpy.arange(PARALLEL_LENGTH, dtype=BASE_TYPE)*seedstep
