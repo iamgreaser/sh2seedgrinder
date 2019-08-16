@@ -53,8 +53,8 @@ from typing import Tuple
 # GOTTA GO FAST
 # WITHOUT BEING A BROKEN PILE OF GARBAGE THIS TIME SO GOODBYE NUMBA
 import numpy
-#from numpy import uint32 as BASE_TYPE
-from numpy import int64 as BASE_TYPE
+from numpy import uint32 as BASE_TYPE
+#from numpy import int64 as BASE_TYPE
 
 briefcase_words = [
     "open", "damn", "hell", "town",
@@ -122,7 +122,7 @@ def spew_result(r, seed, m_clock_angle, m_code_blood, m_code_carbon, m_code_spin
 
 def calc_all_from_seed(*, R, zero, match_mask, match_value, results, selection, rreal):
     m_clock_angle = R[1]
-    m_clock_angle += (m_clock_angle > 520) * 60
+    m_clock_angle += (m_clock_angle > BASE_TYPE(520)) * BASE_TYPE(60)
 
     m_code_carbon = (
           (R[ 7] + 1) * 1000
