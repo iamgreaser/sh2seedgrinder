@@ -117,10 +117,11 @@ def calc_all_from_seed(*, R, zero, match_mask, match_value, results, selection, 
     m_clock_angle += (m_clock_angle > BASE_TYPE(520)) * BASE_TYPE(60)
 
     m_code_carbon = (
-          (R[ 7] + BASE_TYPE(1)) * BASE_TYPE(1000)
-        + (R[10] + BASE_TYPE(1)) * BASE_TYPE(100)
-        + (R[13] + BASE_TYPE(1)) * BASE_TYPE(10)
-        + (R[16] + BASE_TYPE(1))
+          R[ 7] * BASE_TYPE(1000)
+        + R[10] * BASE_TYPE(100)
+        + R[13] * BASE_TYPE(10)
+        + R[16]
+        + BASE_TYPE(1111)
     )
     code1digit0 =   R[ 8]
     code2digit0 = ((R[ 9]) + BASE_TYPE(1) + code1digit0) % BASE_TYPE(9)
@@ -135,12 +136,14 @@ def calc_all_from_seed(*, R, zero, match_mask, match_value, results, selection, 
         + code1digit1 * BASE_TYPE(100)
         + code1digit2 * BASE_TYPE(10)
         + code1digit3
+        + BASE_TYPE(1111)
     )
     m_code_spin = (
           code2digit0 * BASE_TYPE(1000)
         + code2digit1 * BASE_TYPE(100)
         + code2digit2 * BASE_TYPE(10)
         + code2digit3
+        + BASE_TYPE(1111)
     )
 
     digit0 = R[(19)]
@@ -151,10 +154,13 @@ def calc_all_from_seed(*, R, zero, match_mask, match_value, results, selection, 
     digit2 += (digit0 <= orig_digit2)
     digit2 += (digit1 <= orig_digit2)
 
+    # FIXME: I recall a seed where this reported 594 but the code was 495.
+    # It matches the sheet, but this may have been something that was done backwards --GM
     m_bug_code = (
-          BASE_TYPE(100)*(digit0+BASE_TYPE(1))
-        + BASE_TYPE(10 )*(digit1+BASE_TYPE(1))
-        + BASE_TYPE(1  )*(digit2+BASE_TYPE(1))
+          BASE_TYPE(100)*digit0
+        + BASE_TYPE(10 )*digit1
+        + BASE_TYPE(1  )*digit2
+        + BASE_TYPE(111)
     )
 
     m_arsonist = zero.copy()
