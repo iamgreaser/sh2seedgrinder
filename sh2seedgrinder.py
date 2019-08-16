@@ -146,9 +146,9 @@ def calc_all_from_seed(*, R, zero, match_mask, match_value, results, selection, 
         + BASE_TYPE(1111)
     )
 
-    digit0 = R[(19)]
-    digit1 = R[(20)]
-    digit2 = R[(21)]
+    digit0 = R[19]
+    digit1 = R[20]
+    digit2 = R[21]
     orig_digit2 = digit2
     digit1 += (digit0 <= digit1)
     digit2 += (digit0 <= orig_digit2)
@@ -165,20 +165,14 @@ def calc_all_from_seed(*, R, zero, match_mask, match_value, results, selection, 
 
     m_arsonist = zero.copy()
 
-    iVar5 = BASE_TYPE(0) + R[22]
-    m_arsonist += BASE_TYPE(6)*(iVar5 == BASE_TYPE(5))*(m_arsonist == BASE_TYPE(0))
-    iVar5 = BASE_TYPE(1) + R[23]
-    m_arsonist += BASE_TYPE(5)*(iVar5 == BASE_TYPE(5))*(m_arsonist == BASE_TYPE(0))
-    iVar5 = BASE_TYPE(2) + R[24]
-    m_arsonist += BASE_TYPE(4)*(iVar5 == BASE_TYPE(5))*(m_arsonist == BASE_TYPE(0))
-    iVar5 = BASE_TYPE(3) + R[25]
-    m_arsonist += BASE_TYPE(3)*(iVar5 == BASE_TYPE(5))*(m_arsonist == BASE_TYPE(0))
-    iVar5 = BASE_TYPE(4) + R[26]
-    m_arsonist += BASE_TYPE(2)*(iVar5 == BASE_TYPE(5))*(m_arsonist == BASE_TYPE(0))
-    iVar5 = BASE_TYPE(5) + R[27]
-    m_arsonist += BASE_TYPE(1)*(iVar5 == BASE_TYPE(5))*(m_arsonist == BASE_TYPE(0))
+    m_arsonist += BASE_TYPE(6)*(R[22] == BASE_TYPE(5))*(m_arsonist == BASE_TYPE(0))
+    m_arsonist += BASE_TYPE(5)*(R[23] == BASE_TYPE(4))*(m_arsonist == BASE_TYPE(0))
+    m_arsonist += BASE_TYPE(4)*(R[24] == BASE_TYPE(3))*(m_arsonist == BASE_TYPE(0))
+    m_arsonist += BASE_TYPE(3)*(R[25] == BASE_TYPE(2))*(m_arsonist == BASE_TYPE(0))
+    m_arsonist += BASE_TYPE(2)*(R[26] == BASE_TYPE(1))*(m_arsonist == BASE_TYPE(0))
+    m_arsonist += BASE_TYPE(1)*(R[27] == BASE_TYPE(0))*(m_arsonist == BASE_TYPE(0))
 
-    m_briefcase = R[(30)]
+    m_briefcase = R[30]
 
     results[0] = m_clock_angle
     results[1] = m_code_blood
