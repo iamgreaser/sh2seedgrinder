@@ -74,34 +74,34 @@ def rand_once(seed: int) -> int:
 
 
 def rand_nlow_coeffs(n: int) -> Tuple[int, int]:
-    a = BASE_TYPE(1)
-    c = BASE_TYPE(0)
+    a = 1
+    c = 0
     for i in range(n):
-        c = BASE_TYPE(c + a) & SEED_ANDMASK
-        a = BASE_TYPE(a * SEED_MUL) & SEED_ANDMASK
+        c = (c + a) & SEED_ANDMASK
+        a = (a * SEED_MUL) & SEED_ANDMASK
     c = (c * SEED_ADD) & SEED_ANDMASK
     return (a, c,)
 
 def rand_nlow_coeffs_accumulated(n: int) -> Tuple[Sequence[int], Sequence[int]]:
-    a = BASE_TYPE(1)
-    c = BASE_TYPE(0)
+    a = 1
+    c = 0
     La: List[int] = []
     Lc: List[int] = []
     for i in range(n):
-        La.append(a)
-        Lc.append(c)
-        c = BASE_TYPE(c + a * SEED_ADD) & SEED_ANDMASK
-        a = BASE_TYPE(a * SEED_MUL) & SEED_ANDMASK
+        La.append(BASE_TYPE(a))
+        Lc.append(BASE_TYPE(c))
+        c = (c + a * SEED_ADD) & SEED_ANDMASK
+        a = (a * SEED_MUL) & SEED_ANDMASK
     return (La, Lc,)
 
 def rand_nlow_accumulated(seed: int, n: int) -> Sequence[int]:
-    a = BASE_TYPE(1)
-    c = BASE_TYPE(0)
+    a = 1
+    c = 0
     L: List[int] = []
     for i in range(n):
-        L.append(((a * seed) + c) & SEED_ANDMASK)
-        c = BASE_TYPE(c + a * SEED_ADD) & SEED_ANDMASK
-        a = BASE_TYPE(a * SEED_MUL) & SEED_ANDMASK
+        L.append(BASE_TYPE(((a * seed) + c) & SEED_ANDMASK))
+        c = (c + a * SEED_ADD) & SEED_ANDMASK
+        a = (a * SEED_MUL) & SEED_ANDMASK
     return L
 
 def spew_result(r, seed, m_clock_angle, m_code_blood, m_code_carbon, m_code_spin, m_bug_code, m_arsonist, m_briefcase):
@@ -125,20 +125,31 @@ def calc_all_from_seed(*, R, zero, match_mask, match_value, results, selection, 
     m_clock_angle += (m_clock_angle > BASE_TYPE(520)) * BASE_TYPE(60)
 
     m_code_carbon = (
-          (R[ 7] + 1) * 1000
-        + (R[10] + 1) * 100
-        + (R[13] + 1) * 10
-        + (R[16] + 1)
+          (R[ 7] + BASE_TYPE(1)) * BASE_TYPE(1000)
+        + (R[10] + BASE_TYPE(1)) * BASE_TYPE(100)
+        + (R[13] + BASE_TYPE(1)) * BASE_TYPE(10)
+        + (R[16] + BASE_TYPE(1))
     )
-    m_code_blood = zero.copy()
-    m_code_spin = zero.copy()
-    for i in range(4):
-        code1digit = R[(8+i*3)]
-        code2digit = ((R[(9+i*3)]) + 1 + code1digit) % 9
-        #m_code_blood += (code1digit+1) * (10**(3-i))
-        #m_code_spin += (code2digit+1) * (10**(3-i))
-        m_code_blood = (code1digit+1) + m_code_blood * 10
-        m_code_spin = (code2digit+1) + m_code_spin * 10
+    code1digit0 =   R[ 8]
+    code2digit0 = ((R[ 9]) + BASE_TYPE(1) + code1digit0) % BASE_TYPE(9)
+    code1digit1 =   R[11]
+    code2digit1 = ((R[12]) + BASE_TYPE(1) + code1digit1) % BASE_TYPE(9)
+    code1digit2 =   R[14]
+    code2digit2 = ((R[15]) + BASE_TYPE(1) + code1digit2) % BASE_TYPE(9)
+    code1digit3 =   R[17]
+    code2digit3 = ((R[18]) + BASE_TYPE(1) + code1digit3) % BASE_TYPE(9)
+    m_code_blood = (
+          code1digit0 * BASE_TYPE(1000)
+        + code1digit1 * BASE_TYPE(100)
+        + code1digit2 * BASE_TYPE(10)
+        + code1digit3
+    )
+    m_code_spin = (
+          code2digit0 * BASE_TYPE(1000)
+        + code2digit1 * BASE_TYPE(100)
+        + code2digit2 * BASE_TYPE(10)
+        + code2digit3
+    )
 
     digit0 = R[(19)]
     digit1 = R[(20)]
@@ -149,25 +160,25 @@ def calc_all_from_seed(*, R, zero, match_mask, match_value, results, selection, 
     digit2 += (digit1 <= orig_digit2)
 
     m_bug_code = (
-          100*(digit0+1)
-        + 10 *(digit1+1)
-        + 1  *(digit2+1)
+          BASE_TYPE(100)*(digit0+BASE_TYPE(1))
+        + BASE_TYPE(10 )*(digit1+BASE_TYPE(1))
+        + BASE_TYPE(1  )*(digit2+BASE_TYPE(1))
     )
 
     m_arsonist = zero.copy()
 
-    if False:
-        # FIXME: Arsonist is broken until I can find out how to make numpy do a scatter operation.
-        arsonist_shuffle = (numpy.full((PARALLEL_LENGTH, 1), 1, dtype=BASE_TYPE) * numpy.arange(6, dtype=BASE_TYPE)).transpose()
-        #print(arsonist_shuffle)
-        for i in range(6):
-            iVar5 = i + R[(22+i)]
-            #print(iVar5, arsonist_shuffle.take(iVar5))
-            m_arsonist += ((5-i)+1)*(iVar5.choose(arsonist_shuffle) == 5)
-            midshuf = arsonist_shuffle.transpose()
-            midshuf.put(iVar5, arsonist_shuffle[i])#.take(i))
-            arsonist_shuffle = midshuf.transpose()
-            print(iVar5, arsonist_shuffle, arsonist_shuffle.take(i))
+    iVar5 = BASE_TYPE(0) + R[22]
+    m_arsonist += BASE_TYPE(6)*(iVar5 == BASE_TYPE(5))*(m_arsonist == BASE_TYPE(0))
+    iVar5 = BASE_TYPE(1) + R[23]
+    m_arsonist += BASE_TYPE(5)*(iVar5 == BASE_TYPE(5))*(m_arsonist == BASE_TYPE(0))
+    iVar5 = BASE_TYPE(2) + R[24]
+    m_arsonist += BASE_TYPE(4)*(iVar5 == BASE_TYPE(5))*(m_arsonist == BASE_TYPE(0))
+    iVar5 = BASE_TYPE(3) + R[25]
+    m_arsonist += BASE_TYPE(3)*(iVar5 == BASE_TYPE(5))*(m_arsonist == BASE_TYPE(0))
+    iVar5 = BASE_TYPE(4) + R[26]
+    m_arsonist += BASE_TYPE(2)*(iVar5 == BASE_TYPE(5))*(m_arsonist == BASE_TYPE(0))
+    iVar5 = BASE_TYPE(5) + R[27]
+    m_arsonist += BASE_TYPE(1)*(iVar5 == BASE_TYPE(5))*(m_arsonist == BASE_TYPE(0))
 
     m_briefcase = R[(30)]
 
@@ -179,7 +190,7 @@ def calc_all_from_seed(*, R, zero, match_mask, match_value, results, selection, 
     results[5] = m_arsonist
     results[6] = m_briefcase
     results[7] = rreal
-    results[8] = R[(0)]
+    results[8] = R[0]
     selection = ((results*match_mask==match_value*match_mask).sum(axis=0) == 9)
 
     return (selection, results)
@@ -281,14 +292,13 @@ def grind_seeds(*, matches, seedoffs, seedstep) -> int:
         #rslot += did_calc
         #print(new_results)
 
-        R *= seedstep_a
+        R *= BASE_TYPE(seedstep_a)
         R &= SEED_ANDMASK
-        R += seedstep_c
+        R += BASE_TYPE(seedstep_c)
         R &= SEED_ANDMASK
         #seed = R[0]
 
-        #if ((r-seedoffs+seedstep) & 0xFFFFF) == 0: print((r-seedoffs+seedstep)*100.0/(1<<31))
-        if ((r-seedoffs+seedstep_parallel) & 0xFFFF) == 0: print((r-seedoffs+seedstep_parallel)*100.0/(1<<31))
+        if ((r-seedoffs+seedstep_parallel) & 0xFFFFF) == 0: print((r-seedoffs+seedstep_parallel)*100.0/(1<<31))
 
         if rslot >= 100:
             return out_results
